@@ -1,0 +1,10 @@
+screens/ui_Screen1.c
+ui.c
+components/ui_comp_hook.c
+ui_helpers.c
+images/ui_img_942215904.c
+images/ui_img_1601502596.c
+images/ui_img_light_png.c
+images/ui_img_safety_belt_png.c
+images/ui_img_temp_gray_png.c
+images/ui_img_turn_light_png.c

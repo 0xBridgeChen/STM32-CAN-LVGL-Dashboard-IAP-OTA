@@ -1,0 +1,24 @@
+# Keil MDK-ARM 编译中间产物 (不上传 GitHub，保持仓库轻量干净)
+*.o
+*.d
+*.crf
+*.dep
+*.lnp
+*.lst
+*.map
+*.htm
+*.build_log.htm
+*.iex
+*.tra
+*.Bak
+*.bak
+*.uvguix.*
+*.uvoptx
+JLink*
+Listings/
+DebugConfig/
+RTE/
+
+# 保留最终可烧录的 .hex 和 .bin 成品固件
+!*.hex
+!*.bin
