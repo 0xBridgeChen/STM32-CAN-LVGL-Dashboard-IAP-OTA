@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "inter_flashif.h": "c",
+        "main.h": "c",
+        "inter_flash_cfg.h": "c",
+        "stdio.h": "c",
+        "ymodem.h": "c",
+        "common.h": "c",
+        "isotp.h": "c",
+        "iso_tp_cfg.h": "c",
+        "canif.h": "c",
+        "isotp_porting.h": "c",
+        "string.h": "c",
+        "isotp_config.h": "c",
+        "isotp_defines.h": "c",
+        "usart.h": "c"
+    }
+}
