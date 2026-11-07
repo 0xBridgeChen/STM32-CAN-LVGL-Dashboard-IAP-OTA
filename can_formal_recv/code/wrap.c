@@ -16,7 +16,8 @@
  * ================================================================
  *********************************************************************************/
 #include "headfile.h"
-
+#include "cmsis_os.h"
+extern osMessageQueueId_t CanRxQueueHandle;
 // ================================================================
 // 1. can_filter_init: CAN1 硬件验收滤波器全通初始化
 //
@@ -63,6 +64,8 @@ void can_filter_init(void)
 
     // ------- 4. 退出初始化模式，正式启动 CAN1 控制器 -------
     HAL_CAN_Start(&hcan1);
+	// ------- 5. 开启 CAN1 FIFO0 消息挂起中断通知 -------
+    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 }
 
 // ================================================================
@@ -137,3 +140,29 @@ uint32_t can_get_message(uint32_t* rx_id, uint32_t* rx_len, uint8_t* rx_data)
 
     return 0; // 成功解析出有效物理报文
 }
+
+// ================================================================
+// 4. CAN1 FIFO0 硬件接收中断回调：把 ID(1字节) + 数据(8字节) 逐字节塞入队列
+// ================================================================
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+	CAN_RxHeaderTypeDef Rxmessage = {0};
+	uint8_t rx_data[8] = {0};
+	if(HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &Rxmessage, rx_data) == HAL_OK)
+	{
+		   if (Rxmessage.StdId == 0x0B3 || Rxmessage.StdId == 0x0B4)
+            {
+		uint8_t id_byte = (uint8_t)Rxmessage.StdId;
+		osMessageQueuePut(CanRxQueueHandle,&id_byte,0,0);
+		for(uint8_t i=0;i<8;i++)
+		{
+			osMessageQueuePut(CanRxQueueHandle, &rx_data[i], 0, 0);
+		}
+	}
+	}
+}
+
+
+
+
+

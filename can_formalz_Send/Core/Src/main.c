@@ -26,6 +26,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 #include "can.h"
 #include "usart.h"
 #include "gpio.h"
@@ -63,10 +64,12 @@ typedef struct{
 // ★ 串口 2 单字节中断接收缓存与帧组装结构体
 uint8_t uart2_rx_byte = 0;
 UART_RX_typedef uart2_rx = {0};
+extern osMessageQueueId_t CommandQueueHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -113,6 +116,15 @@ int main(void)
   HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1);
   can_filter_init();
   /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -170,44 +182,11 @@ void SystemClock_Config(void)
 // ================================================================
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if (huart->Instance == USART2)
+	if(huart->Instance ==USART2)
 	{
-		// ---- 第一步：收到 1 字节塞入缓存数组 ----
-		uart2_rx.rx_buf[uart2_rx.rx_cnt] = uart2_rx_byte;
-		uart2_rx.rx_cnt = uart2_rx.rx_cnt + 1;
-
-		// ---- 第二步：★ 防错位机制：只要第 0 个字节不是帧头 0xAF，立刻清零丢弃杂波 ----
-		if (uart2_rx.rx_buf[0] != 0xAF)
-		{
-			uart2_rx.rx_cnt = 0;
-		}
-		// ---- 第三步：攒齐 8 字节后校验子功能码并投递到 CAN1 总线 (ID: 0x0B4) ----
-		else if (uart2_rx.rx_cnt >= 8)
-		{
-			// 校验：第 1 字节必须是合法子功能 0x01 ~ 0x07
-			if (uart2_rx.rx_buf[1] >= 0x01 && uart2_rx.rx_buf[1] <= 0x07)
-			{
-				// 直接原封不动将 8 字节打入 CAN1 邮箱 (ID: 0x0B4)
-				can_send_message(0x0B4, 8, uart2_rx.rx_buf);
-
-				// 串口 1 打印监控反馈
-				printf("[CAN TX OK] Sub-ID: 0x%02X, Data: ", uart2_rx.rx_buf[1]);
-				for (uint8_t i = 0; i < 8; i++)
-				{
-					printf("%02X ", uart2_rx.rx_buf[i]);
-				}
-				printf("\r\n");
-			}
-			else
-			{
-				printf("[Error] Invalid Sub-ID: 0x%02X\r\n", uart2_rx.rx_buf[1]);
-			}
-
-			// 处理完毕，清空计数等待下一帧
-			uart2_rx.rx_cnt = 0;
-		}
-
-		// ---- 第四步：重新开启下一次 1 字节接收中断 ----
+		// 1. 将收到的 1 字节立即塞入 CommandQueue 队列（中断中 timeout 必须填 0！）
+		osMessageQueuePut(CommandQueueHandle, &uart2_rx_byte, 0, 0);
+		// 2. 立即重新开启下一次 1 字节接收中断
 		HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1);
 	}
 }
@@ -218,6 +197,28 @@ int fputc(int ch, FILE *f)
   return ch;
 }
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM7 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM7)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.

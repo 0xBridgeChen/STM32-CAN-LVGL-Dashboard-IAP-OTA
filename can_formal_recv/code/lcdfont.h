@@ -396,7 +396,7 @@ const unsigned char ascii_3216[][64]={
 
 typedef struct 
 {
-	unsigned char Index[2];	
+	unsigned char Index[4];	
 	unsigned char Msk[24];
 }typFNT_GB12; 
 
@@ -417,7 +417,7 @@ const typFNT_GB12 tfont12[]={
 
 typedef struct 
 {
-	unsigned char Index[2];	
+	unsigned char Index[4];	
 	unsigned char Msk[32];
 }typFNT_GB16; 
 
@@ -439,7 +439,7 @@ const typFNT_GB16 tfont16[]={
 
 typedef struct 
 {
-	unsigned char Index[2];	
+	unsigned char Index[4];	
 	unsigned char Msk[72];
 }typFNT_GB24; 
 
@@ -481,7 +481,7 @@ const typFNT_GB24 tfont24[]={
 
 typedef struct 
 {
-	unsigned char Index[2];	
+	unsigned char Index[4];	
 	unsigned char Msk[128];
 }typFNT_GB32; 
 

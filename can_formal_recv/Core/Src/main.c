@@ -31,13 +31,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "can_handle.h"  
+#include "cmsis_os.h"
 #include "can.h"
 #include "rtc.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "can_handle.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,6 +47,7 @@
 #include "inter_flash_cfg.h"
 #include "lvgl.h"
 #include "lv_port_disp_template.h"
+#include "lv_demo_stress.h"
 #include "ui.h"
 /* USER CODE END Includes */
 
@@ -72,6 +74,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 void App_UI_Update(void);
 void App_RTC_Update(void);
@@ -162,6 +165,15 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -169,27 +181,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // ------- 任务 1: LVGL GUI 引擎调度轮询 (脏矩形重绘与动画) -------
-    lv_timer_handler();
-    HAL_Delay(5);
-
-    // ------- 任务 2: CAN1 报文非阻塞轮询捕获与 OTA 升级请求响应 -------
-    can_recv_handle();
-    if (flag_ota == 1)
-    {
-        // ★ 收到 0x0B3 升级唤醒帧：在 Sector 3 (0x0800C000) 立下 ota_flag=1 字据并软复位回 Bootloader
-        flag_ota = 0;
-        printf("[APP1] Received 0x0B3 OTA request, setting ota_flag=1 and resetting...\r\n");
-        inter_flash_cfg_set_app_update_flag(1U);
-        HAL_Delay(100);
-        HAL_NVIC_SystemReset();
-    }
-
-    // ------- 任务 3: 仪表盘 UI 按需刷新 (立红旗机制) -------
-    App_UI_Update();
-
-    // ------- 任务 4: RTC 硬件时钟 1 秒周期刷新 -------
-    App_RTC_Update();
   }
   /* USER CODE END 3 */
 }
@@ -371,6 +362,28 @@ void App_RTC_Update(void)
     }
 }
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM7 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM7)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
