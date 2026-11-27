@@ -1,0 +1,81 @@
+name: Repo Hygiene and Static Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  repo-hygiene:
+    name: Repository Hygiene Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for build artifacts and forbidden bloat
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, sys
+
+          files = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8', errors='replace').split('\0')
+          files = [f for f in files if f]
+
+          bad_ext = re.compile(r'\.(axf|o|d|crf|dep|lnp|lst|map|htm|iex|tra|sct|uvoptx|log|exe|bin|hex|lib|a)$', re.I)
+          bad_dir = re.compile(r'(^|/)(Drivers/CMSIS/DSP|Drivers/CMSIS/NN|Drivers/CMSIS/Lib|Objects|Listings|DebugConfig|RTE|\.vscode)(/|$)', re.I)
+          bad_bak = re.compile(r'(\.bak|\.cleanv9_bak|\.teacher_rpm_bak|\.uvguix)$', re.I)
+
+          violations = []
+          oversized = []
+          for f in files:
+              if bad_ext.search(f) or bad_dir.search(f) or bad_bak.search(f):
+                  violations.append(f)
+              elif os.path.exists(f) and os.path.getsize(f) > 2 * 1024 * 1024:
+                  oversized.append((f, os.path.getsize(f)))
+
+          if violations:
+              print("Forbidden tracked artifacts/bloat detected:")
+              for v in violations[:50]:
+                  print("  -", v)
+          if oversized:
+              print("Oversized (>2MB) tracked files detected:")
+              for f, sz in oversized:
+                  print(f"  - {f} ({sz/1024/1024:.2f} MB)")
+
+          if violations or oversized:
+              sys.exit(1)
+          print(f"Hygiene check passed across {len(files)} tracked files.")
+          PY
+
+  cppcheck-static-analysis:
+    name: Static Analysis (cppcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck on custom application sources (advisory baseline)
+        run: |
+          cppcheck --enable=warning,performance,portability \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --std=c99 \
+            --error-exitcode=0 \
+            can_formal_bootloader/Core/Src \
+            can_formal_bootloader/code \
+            can_formal_recv/Core/Src \
+            can_formal_recv/code \
+            can_formal_app2/Core/Src \
+            can_formal_app2/code \
+            can_formal_usb_tool/Core/Src \
+            can_formal_usb_tool/canif \
+            can_formal_usb_tool/common \
+            can_formal_usb_tool/iso_tpif \
+            can_formal_usb_tool/inter_flashif \
+            can_formal_usb_tool/ymodem \
+            can_formalz_Send/Core/Src \
+            can_formalz_Send/code

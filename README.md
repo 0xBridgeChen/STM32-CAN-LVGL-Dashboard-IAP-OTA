@@ -1,4 +1,7 @@
-# 基于 STM32F407 + STM32F103 的车载 CAN 数字仪表盘与 ISO-TP 远程 OTA 刷写系统 (V2.0 FreeRTOS 车规升级版)
+# 基于 STM32F407 + STM32F103 的车载 CAN 数字仪表盘与跨网段 ISO-TP OTA 刷写系统 (V2.0 FreeRTOS 车规升级版)
+
+[![Repo Hygiene & Static Analysis](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 > **项目定位**：参考汽车电子 HIL（硬件在环）思路搭建的桌面实验台架，采用 **STM32F103ZET6（FreeRTOS 数据网关 / 刷写工具）+ STM32F407VET6（FreeRTOS 数字仪表 ECU）** 双节点物理 CAN 2.0B 网络，实现 **CMSIS-RTOS V2 多任务调度**、**LVGL 8.3.11 双主题仪表渲染**、**参考 AUTOSAR E2E Profile 1 思路的报文保护（Rolling Counter + SAE J1850 CRC8）**、**参考 UDS NRC 0x22 的刷写前置条件互锁（车辆静止才允许升级）**、**三段式 Flash Bootloader**，以及 **Ymodem → ISO 15765-2 (ISO-TP) 跨 CAN 网络的双 APP 互相刷写**。
 >
@@ -134,8 +137,8 @@ flowchart LR
 | 工程文件夹 | 目标芯片 | Flash 起始地址 | 核心职责与功能说明 |
 | :--- | :--- | :--- | :--- |
 | [`can_formal_bootloader`](./can_formal_bootloader) | `STM32F407VET6` | `0x08000000` (48 KB) | **接收端 Bootloader（极简裸机）**：上电校验 Sector 3 (`0x0800C000`) 的 `ota_flag`；`ota_flag=0` 时校验栈顶 `MSP` 并跳转 `0x08010000`；`ota_flag=1` 时擦除 Sector 4~7、回复 `0x0D3` 应答、运行 ISO-TP 服务接收 2KB 固件块写入 Flash。 |
-| [`can_formal_recv`](./can_formal_recv) | `STM32F407VET6` | `0x08010000` (448 KB) | **APP1（FreeRTOS 双表盘数字仪表）**：含 `CanTask`/`GuiTask`/`RtcTask` 三任务、`CanRxQueue` 队列与 `LvglMutex` 互斥锁；支持 **CRC8 校验**与 **静止刷写前置条件互锁**（仅当 `speed==0 && Rpm==0` 时响应 `0x0B3` 置位 `ota_flag=1` 软复位）。产物：[`APP_Car.bin`](./can_formal_recv/APP_Car.bin)。 |
-| [`can_formal_app2`](./can_formal_app2) | `STM32F407VET6` | `0x08010000` (448 KB) | **APP2（黑猫警长主题 LVGL 座舱）**：动态座舱渲染、CAN `0x0B4` 在线联动与离线巡航演示；同样支持收到 `0x0B3` 置位 `ota_flag=1` 软复位回 Bootloader，实现 **APP1 ⇄ APP2 无限次互升**。产物：[`app2_agy.bin`](./can_formal_app2/app2_agy.bin)。 |
+| [`can_formal_recv`](./can_formal_recv) | `STM32F407VET6` | `0x08010000` (448 KB) | **APP1（FreeRTOS 双表盘数字仪表）**：含 `CanTask`/`GuiTask`/`RtcTask` 三任务、`CanRxQueue` 队列与 `LvglMutex` 互斥锁；支持 **CRC8 校验**与 **静止刷写前置条件互锁**（仅当 `speed==0 && Rpm==0` 时响应 `0x0B3` 置位 `ota_flag=1` 软复位）。产物：`APP_Car.bin`（见 Releases）。 |
+| [`can_formal_app2`](./can_formal_app2) | `STM32F407VET6` | `0x08010000` (448 KB) | **APP2（黑猫警长主题 LVGL 座舱）**：动态座舱渲染、CAN `0x0B4` 在线联动与离线巡航演示；同样支持收到 `0x0B3` 置位 `ota_flag=1` 软复位回 Bootloader，实现 **APP1 ⇄ APP2 无限次互升**。产物：`app2_agy.bin`（见 Releases）。 |
 | [`can_formal_usb_tool`](./can_formal_usb_tool) | `STM32F103ZET6` | `0x08000000` (512 KB) | **CAN OTA 升级网关**：串口 2 (`PA2/PA3`) 接收电脑 `AF 00 01 FA` 握手指令，发送 `0x0B3` 唤醒 F407 并等待 `0x0D3` 擦除完成应答，随后通过 Ymodem 接收 `.bin` 文件并按 2048B 分块经 ISO-TP (`0x0B2`) 刷写 F407。 |
 | [`can_formalz_Send`](./can_formalz_Send) | `STM32F103ZET6` | `0x08000000` (512 KB) | **车辆状态 CAN 发送端（FreeRTOS 版）**：含 `CommandTask`/`CanTxTask` 双任务、双消息队列与 `UsartMutex` 互斥锁；串口 2 接收 8 字节指令后，自动在 `Byte6` 注入 `0~15` 滚动计数、`Byte7` 注入 **SAE J1850 `CRC8`**，封装为 `0x0B4` 标准帧广播至 CAN 总线。 |
 
@@ -179,10 +182,27 @@ flowchart LR
 
 ---
 
-## 六、快速上手与 OTA 升级演示步骤
+## 六、编译构建与 OTA 升级演示步骤
+
+### 6.1 开发环境与编译构建说明
+
+- **IDE 与编译器**：Keil MDK-ARM v5 + **ARM Compiler 5 (`ARMCC / uAC6=0`)**
+- **工程与 IROM1 地址配置**：
+
+| 子工程 | Keil 工程文件 | 目标芯片 | IROM1 起始地址 / 大小 |
+|---|---|---|---|
+| Bootloader | [`can_formal_bootloader/MDK-ARM/can_test01.uvprojx`](./can_formal_bootloader/MDK-ARM/can_test01.uvprojx) | `STM32F407VETx` | `0x08000000` / `0xC000` (48 KB) |
+| APP1（双表盘） | [`can_formal_recv/MDK-ARM/can_test01.uvprojx`](./can_formal_recv/MDK-ARM/can_test01.uvprojx) | `STM32F407VETx` | `0x08010000` / `0x70000` (448 KB) |
+| APP2（黑猫警长） | [`can_formal_app2/MDK-ARM/can_test01.uvprojx`](./can_formal_app2/MDK-ARM/can_test01.uvprojx) | `STM32F407VETx` | `0x08010000` / `0x70000` (448 KB) |
+| 刷写网关 | [`can_formal_usb_tool/MDK-ARM/usb_tool.uvprojx`](./can_formal_usb_tool/MDK-ARM/usb_tool.uvprojx) | `STM32F103ZETx` | `0x08000000` / `0x80000` (512 KB) |
+| 车辆仿真发送端 | [`can_formalz_Send/MDK-ARM/can_teat01z.uvprojx`](./can_formalz_Send/MDK-ARM/can_teat01z.uvprojx) | `STM32F103ZETx` | `0x08000000` / `0x80000` (512 KB) |
+
+- **成品固件归档说明**：为保持源码仓库轻量，`.hex` / `.bin` 成品二进制已移出 Git 跟踪，请从 **GitHub Releases**（或本地归档目录 `releases/`，附 `SHA256SUMS.txt`）获取；在 Keil 修改源码后可通过 `fromelf --bin --output=APP_Car.bin Objects/can_test01.axf` 导出最新 `.bin`。
+
+### 6.2 烧录与台架升级演示
 
 1. **首次烧录**：
-   * 将 [`can_formal_bootloader`](./can_formal_bootloader) 编译生成的 `.hex` 烧录至 `STM32F407VET6`（地址 `0x08000000`），将 [`can_formal_recv`](./can_formal_recv) 烧录至 `0x08010000`。
+   * 将 [`can_formal_bootloader`](./can_formal_bootloader) 编译生成的 `.hex`（或 Releases 中 `f407_bootloader_0x08000000.hex`）烧录至 `STM32F407VET6`（地址 `0x08000000`），将 [`can_formal_recv`](./can_formal_recv) 烧录至 `0x08010000`。
    * 日常仪表联调烧录 [`can_formalz_Send`](./can_formalz_Send) 至 `STM32F103ZET6`；跨网段 OTA 刷写演示时烧录 [`can_formal_usb_tool`](./can_formal_usb_tool) 至 `STM32F103ZET6`。
 2. **硬件接线**：
    * 两板收发器 `CANH` 接 `CANH`、`CANL` 接 `CANL`、`GND` 共地。
@@ -191,7 +211,7 @@ flowchart LR
    * 若当前仪表车速或转速不为 0（行车状态），发送 `0x0B3` 升级指令将被 F407 拦截并打印 `[Safe-OTA] REJECTED (NRC 0x22)! Vehicle moving...`。
    * 确保车辆处于静止状态（`Speed=0, RPM=0`），串口助手向 ZET6 串口 2 按 HEX 发送 `AF 00 01 FA`。
    * F407 互锁校验通过，自动软复位进入 Bootloader 并擦除 APP 扇区（耗时约 3 秒），随后电脑串口收到 `CCCCC...` 握手信号。
-   * 使用 Ymodem 协议发送 [`app2_agy.bin`](./can_formal_app2/app2_agy.bin)（黑猫警长）或 [`APP_Car.bin`](./can_formal_recv/APP_Car.bin)（双表盘），进度条走完 100% 后屏幕立即点亮新主题！
+   * 使用 Ymodem 协议发送 Releases 中的 `app2_agy.bin`（黑猫警长）或 `APP_Car.bin`（双表盘），进度条走完 100% 后屏幕立即点亮新主题！
 
 
 ---

@@ -1,4 +1,4 @@
-# Keil MDK-ARM 编译中间产物 (不上传 GitHub，保持仓库轻量干净)
+# Keil MDK-ARM 编译中间产物与日志
 *.o
 *.d
 *.crf
@@ -10,15 +10,73 @@
 *.build_log.htm
 *.iex
 *.tra
+*.axf
+*.sct
 *.Bak
 *.bak
+*.bak_*
+*.cleanv9_bak
+*.teacher_rpm_bak
+*.uvguix
 *.uvguix.*
 *.uvoptx
+*.log
 JLink*
+**/MDK-ARM/*.txt
+**/MDK-ARM/*/*.txt
+**/MDK-ARM/*/
+!**/MDK-ARM/can_test01.uvprojx
+!**/MDK-ARM/can_teat01z.uvprojx
+!**/MDK-ARM/usb_tool.uvprojx
+!**/MDK-ARM/startup_*.s
+Objects/
 Listings/
 DebugConfig/
 RTE/
 
-# 保留最终可烧录的 .hex 和 .bin 成品固件
-!*.hex
-!*.bin
+# 成品固件改由 releases/（本地归档）及 GitHub Releases 分发，不进入 Git 源码树
+*.hex
+*.bin
+*.exe
+releases/
+
+# 未被工程引用的第三方大体积静态资源 / DSP / NN 库
+**/Drivers/CMSIS/DSP/
+**/Drivers/CMSIS/Lib/
+**/Drivers/CMSIS/NN/
+**/Drivers/CMSIS/Core_A/
+**/Drivers/CMSIS/DAP/
+**/Drivers/CMSIS/Documentation/
+**/Drivers/CMSIS/docs/
+
+# IDE 本地临时配置
+.vscode/
+can_formal_app2/MDK-ARM/app.uvprojx
+can_formal_app2/Drivers/STM32F1xx_HAL_Driver/
+can_formal_app2/Drivers/CMSIS/Device/ST/STM32F1xx/
+can_formal_app2/Drivers/CMSIS/Device/ST/STM32F4xx/Source/
+can_formal_usb_tool/Drivers/CMSIS/Device/ST/STM32F1xx/Source/
+
+# LVGL 未使用的官方演示、用例、测试与大字体
+can_formal_recv/newcode/demos/music/
+can_formal_recv/newcode/demos/widgets/
+can_formal_recv/newcode/demos/benchmark/
+can_formal_recv/newcode/demos/keypad_encoder/
+can_formal_recv/newcode/lvgl/examples/anim/
+can_formal_recv/newcode/lvgl/examples/arduino/
+can_formal_recv/newcode/lvgl/examples/assets/
+can_formal_recv/newcode/lvgl/examples/event/
+can_formal_recv/newcode/lvgl/examples/get_started/
+can_formal_recv/newcode/lvgl/examples/layouts/
+can_formal_recv/newcode/lvgl/examples/libs/
+can_formal_recv/newcode/lvgl/examples/others/
+can_formal_recv/newcode/lvgl/examples/scroll/
+can_formal_recv/newcode/lvgl/examples/styles/
+can_formal_recv/newcode/lvgl/examples/widgets/
+can_formal_recv/newcode/lvgl/tests/
+can_formal_recv/newcode/lvgl/docs/
+can_formal_app2/midware/lvgl/demos/
+can_formal_app2/midware/lvgl/examples/
+can_formal_app2/midware/lvgl/tests/
+can_formal_app2/midware/lvgl/docs/
+**/korean.ttf
